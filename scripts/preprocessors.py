@@ -3,6 +3,7 @@ import numpy as np
 from sklearn.base import TransformerMixin
 from sklearn.preprocessing import StandardScaler
 from typing import Optional, List
+from sklearn.preprocessing import OneHotEncoder
 
 class BaseDataPreprocessor(TransformerMixin):
     def __init__(self, needed_columns: Optional[List[str]]=None):        
@@ -49,11 +50,6 @@ class SmartDataPreprocessor(TransformerMixin):
         )
     
     def fit(self, data: pd.DataFrame, *args):
-        """
-        Prepares the class for future transformations
-        :param data: pd.DataFrame with all available columns
-        :return: self
-        """
         if self.needed_columns is None:
             self.needed_columns = data.columns.tolist()
         
@@ -82,11 +78,26 @@ class SmartDataPreprocessor(TransformerMixin):
         return result
     
     def transform(self, data: pd.DataFrame) -> np.array:
-        """
-        Transforms features so that they can be fed into the regressors
-        :param data: pd.DataFrame with all available columns
-        :return: np.array with preprocessed features
-        """
         transformed_data = self._transform_features(data)
-        
         return self.scaler.transform(transformed_data)
+    
+
+
+class OneHotPreprocessor(BaseDataPreprocessor):
+    def __init__(self, **kwargs):
+        super(OneHotPreprocessor, self).__init__(**kwargs)
+        self.encoder = OneHotEncoder(drop='if_binary', handle_unknown='ignore', sparse_output=False)
+        self.categorical_columns = interesting_columns
+
+    def fit(self, data, *args):
+        super().fit(data, *args)
+        categorical_data = data[self.categorical_columns]
+        self.encoder.fit(categorical_data) 
+        return self
+
+    def transform(self, data):
+        numerical_features = super().transform(data)
+
+        categorical_data = data[self.categorical_columns]
+        categorical_features = self.encoder.transform(categorical_data)
+        return np.hstack([numerical_features, categorical_features])
