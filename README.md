@@ -1,13 +1,13 @@
 # Housing Price Analysis
 
-A research project inspired by Yandex ML trainings. It's for predicting **house prices** in Ames with **detailed exploratory analysis (EDA)** and **visual comparisons** of multiple regression models.
+A research project inspired by Yandex ML trainings. It's for predicting **house prices** in Ames with **exploratory analysis (EDA)** and **visual comparisons** of regression models.
 
 The project includes:
-- **Preprocess continuous and categorical features** (+manual transformations).
-- **Custom regression models** (ex, `SGDLinearRegressor`).
-- **Оne-hot encoding** for categorical variables.
-- **Training pipelines** (`sklearn.pipeline.Pipeline`).
-- **Visualize data and model performance** via metrics such as MAE, RMSLE, etc.
+- **Preprocess continuous and categorical features**
+- **Custom regression models** (ex, `SGDLinearRegressor`)
+- **Оne-hot encoding** for categorical variables
+- **Training pipelines** (`sklearn.pipeline.Pipeline`)
+- **Visualize data and model performance** via metrics such as MAE, RMSLE, etc
 
 ---
 
