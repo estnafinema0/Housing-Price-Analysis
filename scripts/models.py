@@ -15,7 +15,7 @@ class ExponentialLinearRegression(BaseEstimator, RegressorMixin):
         """Initialize the model with Ridge regression parameters."""
         self.model = Ridge(*args, **kwargs)
     
-    def fit(self, X: np.ndarray, y: np.ndarray) -> 'ExponentialLinearRegression':
+    def fit(self, X: np.ndarray, y: np.ndarray):
         if (y <= 0).any():
             raise ValueError("Target values must be positive for log transformation")
         
@@ -29,7 +29,7 @@ class ExponentialLinearRegression(BaseEstimator, RegressorMixin):
     def get_params(self, deep: bool = True) -> dict:
         return self.model.get_params(deep=deep)
     
-    def set_params(self, **params) -> 'ExponentialLinearRegression':
+    def set_params(self, **params):
         self.model.set_params(**params)
         return self
 
@@ -41,54 +41,56 @@ class SGDLinearRegressor(BaseEstimator, RegressorMixin):
     for optimization.
     """
     
-    def __init__(
-        self,
-        lr: float = 0.01,
-        regularization: float = 1.0,
-        delta_converged: float = 1e-3,
-        max_steps: int = 1000,
-        batch_size: int = 64
-    ):
-        self.lr = lr
-        self.regularization = regularization
-        self.delta_converged = delta_converged
-        self.max_steps = max_steps
+    def __init__(self, learning_rate=0.01, batch_size=32, n_iterations=1000, 
+                 l2_reg=0.0, momentum=0.9):
+        self.learning_rate = learning_rate
         self.batch_size = batch_size
+        self.n_iterations = n_iterations
+        self.l2_reg = l2_reg
+        self.momentum = momentum
         
-        self.W = None
-        self.b = None
+        # Добавляем списки для хранения истории
+        self.loss_history = []
+        self.weight_norm_history = []
+        self.gradient_norm_history = []
         
     def fit(self, X: np.ndarray, y: np.ndarray) -> 'SGDLinearRegressor':
-        n_features = X.shape[1]
+        n_samples, n_features = X.shape
+        
+        # Initialize parameters
         self.W = np.zeros(n_features)
         self.b = 0
+        self.v_W = np.zeros_like(self.W)  # momentum for weights
+        self.v_b = 0  # momentum for bias
         
-        n_samples = X.shape[0]
-        prev_W = np.zeros_like(self.W)
-        prev_b = 0
-        
-        for step in range(self.max_steps):
-            batch_indices = np.random.choice(n_samples, self.batch_size, replace=False)
+        # Training loop
+        for i in range(self.n_iterations):
+            # Sample random batch
+            batch_indices = np.random.choice(n_samples, self.batch_size)
             X_batch = X[batch_indices]
             y_batch = y[batch_indices]
             
+            # Forward pass
             y_pred = X_batch @ self.W + self.b
             
+            # Compute gradients
             grad_W = (2/self.batch_size) * X_batch.T @ (y_pred - y_batch) + \
-                    2 * self.regularization * self.W
+                    2 * self.l2_reg * self.W
             grad_b = (2/self.batch_size) * np.sum(y_pred - y_batch)
             
-            self.W = self.W - self.lr * grad_W
-            self.b = self.b - self.lr * grad_b
+            # Update with momentum
+            self.v_W = self.momentum * self.v_W - self.learning_rate * grad_W
+            self.v_b = self.momentum * self.v_b - self.learning_rate * grad_b
             
-            W_diff = np.linalg.norm(self.W - prev_W)
-            b_diff = abs(self.b - prev_b)
-            if W_diff < self.delta_converged and b_diff < self.delta_converged:
-                break
-                
-            prev_W = self.W.copy()
-            prev_b = self.b
+            self.W += self.v_W
+            self.b += self.v_b
             
+            # Save history
+            loss = np.mean((y_pred - y_batch) ** 2) + self.l2_reg * np.sum(self.W ** 2)
+            self.loss_history.append(loss)
+            self.weight_norm_history.append(np.linalg.norm(self.W))
+            self.gradient_norm_history.append(np.linalg.norm(grad_W))
+        
         return self
     
     def predict(self, X: np.ndarray) -> np.ndarray:
