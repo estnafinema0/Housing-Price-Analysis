@@ -1,118 +1,100 @@
 import pandas as pd
 import numpy as np
-from sklearn.base import TransformerMixin
+from sklearn.base import BaseEstimator, TransformerMixin
 from sklearn.preprocessing import StandardScaler, OneHotEncoder
 from typing import Optional, List, Dict, Union
+from .column_definitions import get_continuous_columns, get_categorical_columns
 
-class BaseDataPreprocessor(TransformerMixin):
-    """Base class for data preprocessing with standardization capabilities.
+class BaseDataPreprocessor(BaseEstimator, TransformerMixin):
+    """Basic preprocessor that scales continuous features."""
     
-    Attributes:
-        needed_columns: List of column names to be processed.
-        scaler: StandardScaler instance for feature scaling.
-    """
-    
-    def __init__(self, needed_columns: Optional[List[str]] = None):
-        self.needed_columns = needed_columns
+    def __init__(self):
         self.scaler = StandardScaler()
-
-    def fit(self, data: pd.DataFrame, *args) -> 'BaseDataPreprocessor':
-        if self.needed_columns is None:
-            self.needed_columns = data.columns.tolist()
-            
-        selected_data = data[self.needed_columns]
-        self.scaler.fit(selected_data)
+        self.continuous_cols = get_continuous_columns()
         
+    def fit(self, X: pd.DataFrame, y=None):
+        # Выбираем только числовые колонки
+        X_numeric = X[self.continuous_cols]
+        self.scaler.fit(X_numeric)
         return self
-
-    def transform(self, data: pd.DataFrame) -> np.ndarray:
-        selected_data = data[self.needed_columns]
-        return self.scaler.transform(selected_data)
-
-
-class SmartDataPreprocessor(TransformerMixin):
-    """Advanced preprocessor with geographic feature engineering.
     
-    Attributes:
-        needed_columns: List of column names to be processed.
-        scaler: StandardScaler instance for feature scaling.
-        medians: Dictionary storing median values for imputation.
-        city_center: Dictionary storing city center coordinates.
-    """
+    def transform(self, X: pd.DataFrame):
+        # Выбираем только числовые колонки
+        X_numeric = X[self.continuous_cols]
+        return self.scaler.transform(X_numeric)
     
-    def __init__(self, needed_columns: Optional[List[str]] = None):
-        self.needed_columns = needed_columns
+    def fit_transform(self, X: pd.DataFrame, y=None):
+        # Выбираем только числовые колонки
+        X_numeric = X[self.continuous_cols]
+        return self.scaler.fit_transform(X_numeric)
+
+class OneHotPreprocessor(BaseEstimator, TransformerMixin):
+    """Preprocessor that applies one-hot encoding to categorical features 
+    and scales continuous features."""
+    
+    def __init__(self):
+        self.numeric_scaler = StandardScaler()
+        self.categorical_encoder = OneHotEncoder(sparse_output=False, handle_unknown='ignore')
+        self.continuous_cols = get_continuous_columns()
+        self.categorical_cols = get_categorical_columns()
+        
+    def fit(self, X: pd.DataFrame, y=None):
+        # Обрабатываем числовые признаки
+        X_numeric = X[self.continuous_cols]
+        self.numeric_scaler.fit(X_numeric)
+        
+        # Обрабатываем категориальные признаки
+        X_categorical = X[self.categorical_cols]
+        self.categorical_encoder.fit(X_categorical)
+        return self
+    
+    def transform(self, X: pd.DataFrame):
+        # Преобразуем числовые признаки
+        X_numeric = X[self.continuous_cols]
+        X_numeric_scaled = self.numeric_scaler.transform(X_numeric)
+        
+        # Преобразуем категориальные признаки
+        X_categorical = X[self.categorical_cols]
+        X_categorical_encoded = self.categorical_encoder.transform(X_categorical)
+        
+        # Объединяем преобразованные признаки
+        return np.hstack([X_numeric_scaled, X_categorical_encoded])
+    
+    def fit_transform(self, X: pd.DataFrame, y=None):
+        return self.fit(X).transform(X)
+
+class SmartDataPreprocessor(BaseEstimator, TransformerMixin):
+    """Advanced preprocessor with additional feature engineering."""
+    
+    def __init__(self):
         self.scaler = StandardScaler()
-        self.medians = {}
-        self.city_center = None
+        self.continuous_cols = get_continuous_columns()
         
-    def _calculate_city_center(self, data: pd.DataFrame) -> None:
-        self.city_center = {
-            'longitude': data['Longitude'].median(),
-            'latitude': data['Latitude'].median()
-        }
-    
-    def _calculate_distance_to_center(self, data: pd.DataFrame) -> np.ndarray:
-        return np.sqrt(
-            (data['Longitude'] - self.city_center['longitude']) ** 2 +
-            (data['Latitude'] - self.city_center['latitude']) ** 2
-        )
-    
-    def fit(self, data: pd.DataFrame, *args) -> 'SmartDataPreprocessor':
-        if self.needed_columns is None:
-            self.needed_columns = data.columns.tolist()
-        
-        self.medians['Lot_Frontage'] = data['Lot_Frontage'][data['Lot_Frontage'] > 0].median()
-        
-        self._calculate_city_center(data)
-        transformed_data = self._transform_features(data)
-        self.scaler.fit(transformed_data)
-        
+    def fit(self, X: pd.DataFrame, y=None):
+        X_numeric = X[self.continuous_cols]
+        self.scaler.fit(X_numeric)
         return self
     
-    def _transform_features(self, data: pd.DataFrame) -> pd.DataFrame:
-        result = data.copy()
+    def transform(self, X: pd.DataFrame):
+        X_numeric = X[self.continuous_cols]
+        X_scaled = self.scaler.transform(X_numeric)
         
-        mask = result['Lot_Frontage'] == 0
-        result.loc[mask, 'Lot_Frontage'] = self.medians['Lot_Frontage']
-        
-        result['Distance_To_Center'] = self._calculate_distance_to_center(result)
-        
-        if self.needed_columns is not None:
-            selected_columns = self.needed_columns + ['Distance_To_Center']
-            result = result[selected_columns]
+        # Добавляем расчет расстояния до центра, если есть координаты
+        if 'Longitude' in self.continuous_cols and 'Latitude' in self.continuous_cols:
+            lon_idx = self.continuous_cols.index('Longitude')
+            lat_idx = self.continuous_cols.index('Latitude')
             
-        return result
-    
-    def transform(self, data: pd.DataFrame) -> np.ndarray:
-        transformed_data = self._transform_features(data)
-        return self.scaler.transform(transformed_data)
-
-
-class OneHotPreprocessor(BaseDataPreprocessor):    
-    def __init__(self, categorical_columns: Optional[List[str]] = None, **kwargs):
-        super().__init__(**kwargs)
-        self.encoder = OneHotEncoder(
-            drop='if_binary',
-            handle_unknown='ignore',
-            sparse_output=False
-        )
-        self.categorical_columns = categorical_columns or [
-            "Overall_Qual",
-            "Garage_Qual",
-            "Sale_Condition",
-            "MS_Zoning"
-        ]
-
-    def fit(self, data: pd.DataFrame, *args) -> 'OneHotPreprocessor':
-        super().fit(data, *args)
-        categorical_data = data[self.categorical_columns]
-        self.encoder.fit(categorical_data)
-        return self
-
-    def transform(self, data: pd.DataFrame) -> np.ndarray:
-        numerical_features = super().transform(data)
-        categorical_data = data[self.categorical_columns]
-        categorical_features = self.encoder.transform(categorical_data)
-        
-        return np.hstack([numerical_features, categorical_features])
+            # Вычисляем среднее положение (центр)
+            center_lon = np.mean(X_scaled[:, lon_idx])
+            center_lat = np.mean(X_scaled[:, lat_idx])
+            
+            # Вычисляем расстояние до центра
+            distances = np.sqrt(
+                (X_scaled[:, lon_idx] - center_lon)**2 + 
+                (X_scaled[:, lat_idx] - center_lat)**2
+            )
+            
+            # Добавляем расстояние как новый признак
+            X_scaled = np.column_stack([X_scaled, distances])
+            
+        return X_scaled
