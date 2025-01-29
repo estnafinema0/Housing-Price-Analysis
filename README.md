@@ -4,9 +4,9 @@ A research project inspired by Yandex ML trainings. It's for predicting **house 
 
 The project includes:
 - **Preprocess continuous and categorical features**
-- **Custom regression models** (ex, `SGDLinearRegressor`)
+- **Custom regression models**
 - **Оne-hot encoding** for categorical variables
-- **Training pipelines** (`sklearn.pipeline.Pipeline`)
+- **Training pipelines**
 - **Visualize data and model performance** via metrics such as MAE, RMSLE, etc
 
 ---
@@ -40,7 +40,7 @@ The project includes:
 This project builds a regression model to predict housing prices in [Ames, Iowa](https://www.openml.org/d/41211).  
 I use:
 
-- **Continuous data transformations**: ex, scaling.
+- **Continuous data transformations**: scaling.
 - **Categorical data encoding** via `OneHotEncoder`.
 - **Custom linear regression** using stochastic gradient descent, with optional L2 regularization.
 - **Hyperparameter tuning**: grid search and cross-validation.
@@ -200,7 +200,7 @@ The scatter plots show that the OneHot Pipeline follows the ideal prediction lin
 | **SGD Regressor**       | 26,000 | 0.200  | Shows instability after 800 iterations         |
 
 > 💡 **Key results:**
-> - OneHot Pipeline consistently shows best results across both metrics
+> - OneHot Pipeline shows best results across both metrics
 > - SGD Regressor needs more tuning to compete with other models
 ---
 
